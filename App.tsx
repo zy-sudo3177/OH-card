@@ -34,7 +34,7 @@ export default function App() {
   const [activeCardIdx, setActiveCardIdx] = useState(0);
   const [generatingImg, setGeneratingImg] = useState(false); // 仅用于 html2canvas 生成图片时的遮罩
   
-  // Carousel State
+  // Carousel State - 移除轮播逻辑，只保留当前索引
   const [currentRemedyIdx, setCurrentRemedyIdx] = useState(0);
   
   const [deckSpread, setDeckSpread] = useState<TarotCard[]>([]);
@@ -251,52 +251,53 @@ export default function App() {
                 </div>
 
                 {/* 内容区域 */}
-                <div className="flex-1 px-6 pb-6 pt-6 flex flex-col relative">
-                   <div className="flex-1 space-y-2 text-center flex flex-col justify-center">
+                <div className="flex-1 px-8 pb-8 pt-4 flex flex-col relative">
+                   <div className="flex-1 space-y-4 text-center flex flex-col justify-center">
                       
                       {/* 标题 */}
                       <div className="shrink-0">
-                        <p className="text-[#A61B1B] text-[10px] font-bold tracking-[0.3em] uppercase mb-1">{currentRemedy.subName}</p>
-                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-[#1A1A1A] mb-2">{currentRemedy.name}</h1>
-                        <div className="w-8 h-0.5 bg-[#E8C68E] mx-auto"></div>
+                        <p className="text-[#A61B1B] text-xs font-bold tracking-[0.3em] uppercase mb-1">{currentRemedy.subName}</p>
+                        <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#1A1A1A] mb-2 leading-tight">{currentRemedy.name}</h1>
+                        <div className="w-12 h-1 bg-[#E8C68E] mx-auto rounded-full"></div>
                       </div>
 
-                      {/* 小尺寸固定图片 (Fixed Small Image) */}
-                      <div className="w-full flex justify-center py-4 shrink-0">
-                         <div className="w-32 h-32 rounded-full border-4 border-[#E8C68E]/30 shadow-inner overflow-hidden relative group">
+                      {/* 固定的小尺寸插图 (Fixed Small Image) */}
+                      <div className="w-full flex justify-center py-2 shrink-0">
+                         <div className="w-20 h-20 rounded-full border-2 border-[#E8C68E]/50 shadow-inner overflow-hidden relative">
+                            {/* 使用一张固定的、通用的精致鸡尾酒图或图标 */}
                             <SmartImage 
-                              src={currentRemedy.cocktailImageUrl} 
-                              alt="Cocktail" 
-                              className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" 
+                              src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=300&auto=format&fit=crop" 
+                              alt="Cocktail Icon" 
+                              className="w-full h-full object-cover opacity-90" 
                             />
                          </div>
                       </div>
 
                       {/* 描述 */}
-                      <p className="text-slate-600 text-xs leading-relaxed font-serif px-1 line-clamp-[6]">
-                        {currentRemedy.description}
+                      <p className="text-slate-600 text-sm leading-6 font-serif px-2 italic line-clamp-6">
+                        "{currentRemedy.description}"
                       </p>
 
                       {/* 信息块 */}
-                      <div className="grid grid-cols-2 gap-3 text-left border-t border-slate-200 pt-3 mt-4 shrink-0">
+                      <div className="grid grid-cols-2 gap-4 text-left border-t-2 border-slate-100 pt-4 mt-2 shrink-0">
                          <div className="space-y-1">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Recipe</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Recipe</span>
                             <div className="flex flex-wrap gap-1">
                               {currentRemedy.ingredients.slice(0, 3).map((ing, i) => (
-                                <span key={i} className="text-[9px] text-[#A61B1B] bg-[#A61B1B]/5 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{ing}</span>
+                                <span key={i} className="text-[10px] text-[#A61B1B] bg-[#A61B1B]/5 px-2 py-1 rounded-sm whitespace-nowrap">{ing}</span>
                               ))}
                             </div>
                          </div>
-                         <div className="space-y-1 border-l border-slate-100 pl-3">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Action</span>
-                            <p className="text-[10px] text-[#1A1A1A] font-bold leading-tight line-clamp-3">{currentRemedy.actionItem}</p>
+                         <div className="space-y-1 border-l-2 border-slate-100 pl-4">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Action</span>
+                            <p className="text-xs text-[#1A1A1A] font-bold leading-relaxed">{currentRemedy.actionItem}</p>
                          </div>
                       </div>
                    </div>
 
                    {/* 底部版权 */}
-                   <div className="text-center pt-2 mt-1 opacity-40 shrink-0">
-                      <p className="text-[8px] font-serif tracking-[0.3em]">MIND SPIRIT LAB · 2026</p>
+                   <div className="text-center pt-4 opacity-40 shrink-0">
+                      <p className="text-[9px] font-serif tracking-[0.4em]">MIND SPIRIT LAB · 2026</p>
                    </div>
                 </div>
 
@@ -317,7 +318,6 @@ export default function App() {
                        scale: 3, 
                        useCORS: true, 
                        backgroundColor: "#FDFBF7",
-                       // allowTaint: true, // 移除此行，确保可以导出图片
                      });
                      const link = document.createElement('a');
                      link.download = `2026新年特调-${currentRemedy.name}.png`;
