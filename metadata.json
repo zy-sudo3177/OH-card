@@ -1,7 +1,5 @@
 {
-  "name": "2026元气特调 · 元旦启程",
-  "description": "2026马年专属互动：捕捉潜意识愿景，可视化你的开年动力，调制一杯专属的元气能量饮。让这一年如骏马奔腾，锐不可当。",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "灵感特调厅",
+  "description": "2026 情绪可视化：捕捉瞬间灵感，调制一杯专属的“心情特调”。让情绪具象化，开启充满仪式感的新年。",
+  "requestFramePermissions": []
 }
