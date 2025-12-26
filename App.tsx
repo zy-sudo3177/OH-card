@@ -8,6 +8,11 @@ import html2canvas from 'html2canvas';
 
 const SmartImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
   const [loaded, setLoaded] = useState(false);
+  // Reset loaded state when src changes
+  React.useEffect(() => {
+    setLoaded(false);
+  }, [src]);
+
   return (
     <div className={`relative bg-slate-100 overflow-hidden ${className}`}>
       {/* 移除 animate-pulse，只保留简单的背景占位，强调“现成图片”感 */}
@@ -28,16 +33,20 @@ export default function App() {
   const [selections, setSelections] = useState<CardSelection[]>([]);
   const [activeCardIdx, setActiveCardIdx] = useState(0);
   const [generatingImg, setGeneratingImg] = useState(false); // 仅用于 html2canvas 生成图片时的遮罩
-  const [remedy, setRemedy] = useState<RemedyResult | null>(null);
+  
+  // Carousel State
+  const [currentRemedyIdx, setCurrentRemedyIdx] = useState(0);
+  
   const [deckSpread, setDeckSpread] = useState<TarotCard[]>([]);
   
   const reportRef = useRef<HTMLDivElement>(null);
   const fullDeck = useMemo(() => alchemistService.getTarotDeck(), []);
+  const allRemedies = useMemo(() => alchemistService.getAllRemedies(), []);
 
   const resetApp = () => {
     setSelections([]);
     setActiveCardIdx(0);
-    setRemedy(null);
+    setCurrentRemedyIdx(0);
     setStep(AppStep.WELCOME);
     setDeckSpread([]);
   };
@@ -64,13 +73,14 @@ export default function App() {
   };
 
   const generateFinalRemedy = async () => {
-    // 直接获取结果，无加载界面
-    const res = await alchemistService.generateRemedy(selections);
-    setRemedy(res);
+    const idx = alchemistService.calculateRemedyIndex(selections);
+    setCurrentRemedyIdx(idx);
     setStep(AppStep.REMEDY);
   };
 
   const btnPrimary = "px-10 py-4 bg-[#A61B1B] text-white rounded-full text-lg font-bold tracking-[0.2em] shadow-lg hover:bg-[#8a1616] hover:shadow-xl transition-all transform hover:-translate-y-1 active:scale-95";
+
+  const currentRemedy = allRemedies[currentRemedyIdx];
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#1A1A1A] font-sans flex flex-col relative overflow-x-hidden">
@@ -193,10 +203,12 @@ export default function App() {
                   <div className="inline-block px-3 py-1 bg-[#A61B1B]/10 text-[#A61B1B] text-xs font-bold tracking-widest rounded-full mb-4">
                     STANDARD TAROT · CARD 0{activeCardIdx + 1}
                   </div>
-                  <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#1A1A1A] mb-6">
+                  <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#1A1A1A] mb-4">
                     {selections[activeCardIdx].card.name}
                   </h2>
-                  <div className="w-16 h-1 bg-[#E8C68E] mx-auto lg:mx-0 rounded-full"></div>
+                  <p className="text-xl md:text-2xl text-slate-600 font-serif leading-relaxed italic border-l-4 border-[#A61B1B] pl-6 py-2">
+                    "{selections[activeCardIdx].card.meaning}"
+                  </p>
                 </div>
 
                 <div className="pt-6">
@@ -218,7 +230,7 @@ export default function App() {
           </div>
         )}
 
-        {step === AppStep.REMEDY && remedy && (
+        {step === AppStep.REMEDY && currentRemedy && (
           <div className="w-full max-w-4xl reveal-up pb-8 px-2 flex flex-col items-center">
              
              {/* 
@@ -238,47 +250,52 @@ export default function App() {
                    </div>
                 </div>
 
-                {/* 主图 - 固定高度比例 */}
-                <div className="relative w-full aspect-square shrink-0 bg-slate-100">
-                  <SmartImage src={remedy.cocktailImageUrl} alt="Cocktail" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#FDFBF7] via-transparent to-transparent h-20 bottom-0 top-auto"></div>
-                </div>
-
-                {/* 内容区域 - 紧凑排版 */}
-                <div className="flex-1 px-6 pb-6 flex flex-col relative -mt-5">
-                   <div className="flex-1 space-y-3 text-center">
+                {/* 内容区域 */}
+                <div className="flex-1 px-6 pb-6 pt-6 flex flex-col relative">
+                   <div className="flex-1 space-y-2 text-center flex flex-col justify-center">
                       
                       {/* 标题 */}
-                      <div>
-                        <p className="text-[#A61B1B] text-[10px] font-bold tracking-[0.3em] uppercase mb-1">{remedy.subName}</p>
-                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-[#1A1A1A] mb-2">{remedy.name}</h1>
+                      <div className="shrink-0">
+                        <p className="text-[#A61B1B] text-[10px] font-bold tracking-[0.3em] uppercase mb-1">{currentRemedy.subName}</p>
+                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-[#1A1A1A] mb-2">{currentRemedy.name}</h1>
                         <div className="w-8 h-0.5 bg-[#E8C68E] mx-auto"></div>
                       </div>
 
-                      {/* 描述 (限制行数，防止溢出) */}
-                      <p className="text-slate-600 text-xs leading-relaxed font-serif px-1 line-clamp-4">
-                        {remedy.description}
+                      {/* 小尺寸固定图片 (Fixed Small Image) */}
+                      <div className="w-full flex justify-center py-4 shrink-0">
+                         <div className="w-32 h-32 rounded-full border-4 border-[#E8C68E]/30 shadow-inner overflow-hidden relative group">
+                            <SmartImage 
+                              src={currentRemedy.cocktailImageUrl} 
+                              alt="Cocktail" 
+                              className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" 
+                            />
+                         </div>
+                      </div>
+
+                      {/* 描述 */}
+                      <p className="text-slate-600 text-xs leading-relaxed font-serif px-1 line-clamp-[6]">
+                        {currentRemedy.description}
                       </p>
 
                       {/* 信息块 */}
-                      <div className="grid grid-cols-2 gap-3 text-left border-t border-slate-200 pt-3 mt-2">
+                      <div className="grid grid-cols-2 gap-3 text-left border-t border-slate-200 pt-3 mt-4 shrink-0">
                          <div className="space-y-1">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Recipe</span>
                             <div className="flex flex-wrap gap-1">
-                              {remedy.ingredients.slice(0, 3).map((ing, i) => (
+                              {currentRemedy.ingredients.slice(0, 3).map((ing, i) => (
                                 <span key={i} className="text-[9px] text-[#A61B1B] bg-[#A61B1B]/5 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{ing}</span>
                               ))}
                             </div>
                          </div>
                          <div className="space-y-1 border-l border-slate-100 pl-3">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Action</span>
-                            <p className="text-[10px] text-[#1A1A1A] font-bold leading-tight line-clamp-3">{remedy.actionItem}</p>
+                            <p className="text-[10px] text-[#1A1A1A] font-bold leading-tight line-clamp-3">{currentRemedy.actionItem}</p>
                          </div>
                       </div>
                    </div>
 
                    {/* 底部版权 */}
-                   <div className="text-center pt-4 mt-1 opacity-40 shrink-0">
+                   <div className="text-center pt-2 mt-1 opacity-40 shrink-0">
                       <p className="text-[8px] font-serif tracking-[0.3em]">MIND SPIRIT LAB · 2026</p>
                    </div>
                 </div>
@@ -300,12 +317,15 @@ export default function App() {
                        scale: 3, 
                        useCORS: true, 
                        backgroundColor: "#FDFBF7",
-                       allowTaint: true
+                       // allowTaint: true, // 移除此行，确保可以导出图片
                      });
                      const link = document.createElement('a');
-                     link.download = `2026新年特调-${remedy.name}.png`;
+                     link.download = `2026新年特调-${currentRemedy.name}.png`;
                      link.href = canvas.toDataURL("image/png", 1.0);
                      link.click();
+                   } catch (e) {
+                      console.error(e);
+                      alert("图片保存失败，请截图保存。");
                    } finally {
                      setGeneratingImg(false);
                    }

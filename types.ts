@@ -9,6 +9,7 @@ export enum AppStep {
 export interface TarotCard {
   id: number;
   name: string; // 塔罗牌名称 (e.g., The Fool)
+  meaning: string; // 标准解读
   imageUrl: string;
 }
 

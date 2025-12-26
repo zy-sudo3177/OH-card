@@ -7,12 +7,19 @@ export class AlchemistService {
     return [...TAROT_DECK];
   }
 
+  getAllRemedies() {
+    return [...REMEDY_TEMPLATES];
+  }
+
+  calculateRemedyIndex(selections: CardSelection[]): number {
+    const sumIds = selections.reduce((acc, curr) => acc + curr.card.id, 0);
+    return sumIds % REMEDY_TEMPLATES.length;
+  }
+
   // 纯本地逻辑，无延时，直接根据选牌映射结果
   async generateRemedy(selections: CardSelection[]): Promise<RemedyResult> {
-    // 简单哈希算法：ID之和 % 模版数量
-    const sumIds = selections.reduce((acc, curr) => acc + curr.card.id, 0);
-    const resultIndex = sumIds % REMEDY_TEMPLATES.length;
-    return Promise.resolve(REMEDY_TEMPLATES[resultIndex]);
+    const idx = this.calculateRemedyIndex(selections);
+    return Promise.resolve(REMEDY_TEMPLATES[idx]);
   }
 }
 
