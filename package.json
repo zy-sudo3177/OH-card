@@ -1,5 +1,5 @@
 {
-  "name": "oh卡·心灵炼金术",
+  "name": "2026元气特调-·-元旦启程",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,8 @@
   "dependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "@google/genai": "^1.34.0"
+    "@google/genai": "^1.34.0",
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

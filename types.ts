@@ -41,36 +41,36 @@ export interface RemedyResult {
 
 export const SPREADS: Spread[] = [
   {
-    id: 'spring-renewal',
-    name: '辞旧迎新',
-    description: '审视过往岁月的积淀，在这个春天寻找破土而出的新生命力。',
+    id: 'horse-gallop',
+    name: '2026 · 跃马扬鞭',
+    description: '在元旦清晨开启第一步，捕捉内心深处奔腾的执行力与勇气。',
+    icon: 'fa-horse-head',
+    positions: [
+      { label: '起跑原动力', description: '过去积累的经验中，能让你在新的一年瞬间加速的动力。' },
+      { label: '跨越的节奏', description: '此刻你最需要调整的心理节奏或最想突破的障碍。' },
+      { label: '奔腾的终点', description: '2026年终，你期待自己抵达的那片壮阔草场。' }
+    ]
+  },
+  {
+    id: 'vitality-boost',
+    name: '开年 · 龙马精神',
+    description: '发现如何以最饱满、最阳光的状态，驰骋在2026的人生赛道。',
     icon: 'fa-sun',
     positions: [
-      { label: '岁月的余韵', description: '过去一年留在心底最深的印记。' },
-      { label: '立春的觉察', description: '此刻你内心正在复苏的愿望。' },
-      { label: '盛放的可能', description: '未来一年生命最绚烂的指向。' }
+      { label: '自信之源', description: '你性格中如良驹般矫健、充满生命力的核心闪光点。' },
+      { label: '正向交互', description: '新的一年，你与周围的人和环境产生正能量连接的方式。' },
+      { label: '辉煌志向', description: '你期待中那个无所畏惧、勇往直前的自我形象。' }
     ]
   },
   {
-    id: 'inner-wealth',
-    name: '丰盈内在',
-    description: '探索新年的精神财富，审视自己与世界的连接厚度。',
-    icon: 'fa-coins',
+    id: 'vision-steed',
+    name: '宏图 · 千里之志',
+    description: '从细微的觉察中发现宏大的蓝图，为马年的每一项计划注入远见。',
+    icon: 'fa-compass',
     positions: [
-      { label: '珍视的资源', description: '你内心已经拥有的核心力量。' },
-      { label: '流动的连接', description: '你与外界交互中最真实的场域。' },
-      { label: '丰盛的愿景', description: '理想中自我实现的圆满状态。' }
-    ]
-  },
-  {
-    id: 'harmony-field',
-    name: '阖家场域',
-    description: '在团圆的时刻，觉察血缘与情感连接中的温暖与流动。',
-    icon: 'fa-house-chimney-window',
-    positions: [
-      { label: '归处的暖意', description: '家赋予你的最坚实的心理支柱。' },
-      { label: '互动的投射', description: '在亲密关系中你最真实的投射。' },
-      { label: '和解的契机', description: '那些可以达成共鸣与谅解的关键。' }
+      { label: '稳固基石', description: '目前的资源和环境，你起跑前最坚实的基础。' },
+      { label: '远方召唤', description: '2026年里最吸引你的机遇或让你感到使命感的召唤。' },
+      { label: '达成庆典', description: '当你实现目标时，内心那份充盈的成就感与快乐。' }
     ]
   }
 ];

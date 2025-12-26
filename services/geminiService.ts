@@ -10,67 +10,62 @@ export class GeminiService {
   }
 
   async generateOHCards(count: number = 3): Promise<string[]> {
-    const prompt = `一副心理学OH卡图片，风格为极简、抽象的意象艺术。画面柔和、中性，避免过于强烈的暗示。意象包含：流动的线条、远山的轮廓、平静的水面、或者模糊的人影。色彩自然，具有心理疗愈感。`;
+    // 极简 Prompt 提高 Flash 模型响应速度
+    const prompt = `Abstract digital art for psychological OH card. 2026 New Year, Year of the Horse, vitality, rising sun, minimalist, bright colors, optimistic energy. No text.`;
 
-    const tasks = Array.from({ length: count }).map(async () => {
+    const tasks = Array.from({ length: count }).map(async (_, idx) => {
       try {
-        const response = await this.ai.models.generateContent({
+        const aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+        const response = await aiInstance.models.generateContent({
           model: 'gemini-2.5-flash-image',
-          contents: {
-            parts: [{ text: prompt }]
-          },
-          config: {
-            imageConfig: { aspectRatio: "3:4" }
-          }
+          contents: { parts: [{ text: prompt + ` seed:${Math.random()}` }] },
+          config: { imageConfig: { aspectRatio: "3:4" } }
         });
 
         for (const part of response.candidates?.[0]?.content?.parts || []) {
-          if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
-          }
+          if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
         }
-        throw new Error("No image data");
+        throw new Error("No image");
       } catch (err) {
-        console.warn("Card generation failed, using fallback.", err);
-        // 返回一个具有禅意的占位图
-        return `https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80`;
+        console.warn(`Card ${idx} generation failed, using optimized fallback.`);
+        const fallbacks = [
+          'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80',
+          'https://images.unsplash.com/photo-1598974357851-98166a9d9b4c?auto=format&fit=crop&w=600&q=80',
+          'https://images.unsplash.com/photo-1534349762230-e0cadf78f5db?auto=format&fit=crop&w=600&q=80'
+        ];
+        return fallbacks[idx % fallbacks.length];
       }
     });
 
-    const results = await Promise.all(tasks);
-    return results.filter(url => !!url);
+    return Promise.all(tasks);
   }
 
   async generateRemedy(cards: any[], spread: Spread): Promise<RemedyResult> {
-    const summary = cards.map(c => 
-      `${c.positionLabel}（用户联想："${c.interpretation}"，选定色值：${c.selectedColor}）`
-    ).join('\n');
+    const summary = cards.map(c => `- ${c.positionLabel}: "${c.interpretation}"`).join('\n');
 
-    const response = await this.ai.models.generateContent({
+    const aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const response = await aiInstance.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `你是一位深具同理心的心理咨询师。用户刚刚完成了一次主题为"${spread.name}"的OH卡探索。
-
-【用户投射记录】
+      contents: `用户正在进行 2026 马年元旦心理觉察。
+根据以下感悟，调制一杯“元气能量饮”：
 ${summary}
 
-你的任务是：
-1. 尊重并镜像反馈用户的联想。
-2. 整合为一杯代表“心理能量整合”的特调饮品。
-3. 名字：温柔且有力量。
-4. 描述：平和地肯定用户的觉察。
-5. 配方：将情绪抽象为生活成分（如“三克觉察的耐心”）。
-6. 输出JSON格式。`,
+输出纯中文 JSON：
+{
+  "name": "极具动力的特调名称",
+  "description": "100字以内的励志描述",
+  "ingredients": ["3个诗意的活力成分"],
+  "vibe": "一句充满马年精神的座右铭"
+}`,
       config: {
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             name: { type: Type.STRING },
             description: { type: Type.STRING },
-            ingredients: { 
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
+            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
             vibe: { type: Type.STRING }
           },
           required: ["name", "description", "ingredients", "vibe"]
