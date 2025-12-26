@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OH卡·新春觉察 - 2025 艺术特调</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@200;500;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+      
+      :root {
+        --deep-red: #A61B1B;
+        --gold: #E8C68E;
+        --silk: #FDFBF7;
+        --ink: #1A1A1A;
+      }
+
+      body {
+        font-family: 'Noto Sans SC', sans-serif;
+        background: var(--silk);
+        color: var(--ink);
+        margin: 0;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .font-serif { font-family: 'Noto Serif SC', serif; }
+
+      /* 高级噪点与纸张质感 */
+      .paper-texture {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.04;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Cfilter id='noiseFilter'%3%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3%3C/filter%3%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3%3C/svg%3%3E");
+      }
+
+      /* 金箔粒子动画 */
+      .particles {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 0;
+      }
+      .particle {
+        position: absolute; background: var(--gold); border-radius: 2px; opacity: 0.3;
+        animation: fall linear infinite;
+      }
+      @keyframes fall {
+        to { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+      }
+
+      /* 春节红调渐变背景 */
+      .gradient-bg {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: -1;
+        background: radial-gradient(circle at 50% 50%, #fdfbf7 0%, #f9f2ed 100%);
+      }
+
+      .red-glow {
+        position: absolute; border-radius: 50%; filter: blur(150px); opacity: 0.12; z-index: -1;
+        animation: pulse-glow 20s infinite alternate ease-in-out;
+      }
+      
+      @keyframes pulse-glow {
+        from { transform: scale(1); opacity: 0.08; }
+        to { transform: scale(1.4); opacity: 0.2; }
+      }
+
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-slow { animation: spin-slow 12s linear infinite; }
+
+      .reveal-up {
+        animation: reveal-up 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      
+      @keyframes reveal-up {
+        from { opacity: 0; transform: translateY(40px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* 卡片动画升级 */
+      .card-flip-container { perspective: 2500px; }
+      .card-inner {
+        position: relative; width: 100%; height: 100%;
+        transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+        transform-style: preserve-3d;
+      }
+      .card-inner.flipped { transform: rotateY(180deg); }
+      .card-front, .card-back {
+        position: absolute; width: 100%; height: 100%;
+        backface-visibility: hidden; border-radius: 24px;
+      }
+      .card-back {
+        background: white; border: 2px solid rgba(166, 27, 27, 0.1);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      }
+      .card-front { transform: rotateY(180deg); overflow: hidden; border: 8px solid white; box-shadow: 0 40px 80px rgba(0,0,0,0.15); }
+
+      /* 卡片未翻开时的提示动画 */
+      @keyframes card-hint {
+        0%, 100% { box-shadow: 0 0 0 rgba(166, 27, 27, 0); }
+        50% { box-shadow: 0 0 20px rgba(166, 27, 27, 0.1); }
+      }
+      .card-back:not(.flipped) { animation: card-hint 3s infinite; }
+
+      @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; }
+        .remedy-poster { padding: 40px !important; }
+      }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://esm.sh/react@^19.2.3/",
+        "react": "https://esm.sh/react@^19.2.3",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+    <div class="paper-texture"></div>
+    <div class="gradient-bg">
+      <div class="red-glow bg-[#A61B1B] w-[900px] h-[900px] top-[-15%] left-[-15%]"></div>
+      <div class="red-glow bg-[#E8C68E] w-[700px] h-[700px] bottom-[-15%] right-[-15%]" style="animation-delay: -7s;"></div>
+    </div>
+    <div id="root"></div>
+    <script>
+      const particlesContainer = document.getElementById('particles');
+      if (particlesContainer) {
+        for(let i=0; i<30; i++) {
+          const p = document.createElement('div');
+          p.className = 'particle';
+          const size = Math.random() * 4 + 2;
+          p.style.width = size + 'px';
+          p.style.height = size + 'px';
+          p.style.left = Math.random() * 100 + 'vw';
+          p.style.animationDuration = (Math.random() * 10 + 5) + 's';
+          p.style.animationDelay = (Math.random() * 5) + 's';
+          particlesContainer.appendChild(p);
+        }
+      }
+    </script>
+</body>
+</html>
