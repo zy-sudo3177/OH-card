@@ -1,24 +1,27 @@
 
 export enum AppStep {
   WELCOME = 'WELCOME',
-  DRAW_CARDS = 'DRAW_CARDS', // 抽三张牌
-  INTERPRET = 'INTERPRET',   // 对三张牌分别解读和选色
-  MIXING = 'MIXING',         // 调色融合仪式
-  REMEDY = 'REMEDY'          // 最终结果
+  DRAW_CARDS = 'DRAW_CARDS',
+  INTERPRET = 'INTERPRET',
+  REMEDY = 'REMEDY'
+}
+
+export interface TarotCard {
+  id: number;
+  name: string; // 塔罗牌名称 (e.g., The Fool)
+  imageUrl: string;
 }
 
 export interface CardSelection {
-  imageUrl: string;
-  meaning: string; // 时间节点：过去/现在/未来
-  userText: string;
-  selectedColor: string;
-  palette: string[];
+  card: TarotCard;
+  index: number;
 }
 
 export interface RemedyResult {
-  name: string;
-  description: string;
-  ingredients: string[];
-  vibe: string;
-  cocktailImageUrl?: string;
+  name: string;      // 特调名称
+  subName: string;   // 心理学术语
+  description: string; // 解读
+  ingredients: string[]; // 配方
+  actionItem: string; // 行动建议
+  cocktailImageUrl: string;
 }

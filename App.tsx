@@ -1,58 +1,24 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { AppStep, CardSelection, RemedyResult } from './types';
+import React, { useState, useRef, useMemo } from 'react';
+import { AppStep, CardSelection, RemedyResult, TarotCard } from './types';
 import { alchemistService } from './services/geminiService';
-import { extractColorsFromImage } from './utils/colorExtractor';
 import html2canvas from 'html2canvas';
 
-const stages = ["正在梳理人生脉络...", "正在感悟岁月色彩...", "正在注入马年福气...", "正在为您斟满这杯..."];
-
-const LoadingOverlay: React.FC = () => {
-  const [stageIdx, setStageIdx] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setStageIdx((prev) => (prev < stages.length - 1 ? prev + 1 : prev));
-    }, 2500);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-[#1A1A1A] text-white">
-      <div className="flex flex-col items-center space-y-10 animate-pulse">
-        <div className="w-24 h-24 rounded-full border border-[#E8C68E]/30 flex items-center justify-center relative bg-black/50">
-          <i className="fas fa-mug-hot text-[#E8C68E] text-4xl"></i>
-        </div>
-        <div className="text-center space-y-4">
-          <h3 className="text-xl font-serif tracking-[0.2em]">{stages[stageIdx]}</h3>
-          <div className="w-32 h-[1px] bg-[#E8C68E]/50 mx-auto"></div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// 移除 LoadingOverlay 组件，实现“直接调用”
 
 const SmartImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
-  const [error, setError] = useState(false);
   const [loaded, setLoaded] = useState(false);
-
   return (
-    <div className={`relative bg-slate-200 overflow-hidden ${className}`}>
-      {!loaded && !error && <div className="absolute inset-0 bg-slate-300 animate-pulse" />}
-      {error ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FDFBF7] p-4 text-center border border-slate-200">
-          <i className="fas fa-image text-slate-300 text-4xl mb-4"></i>
-          <p className="text-sm text-slate-400 font-serif">图片加载中...</p>
-        </div>
-      ) : (
-        <img 
-          src={src} 
-          alt={alt} 
-          className={`w-full h-full object-cover transition-opacity duration-1000 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-          crossOrigin="anonymous"
-        />
-      )}
+    <div className={`relative bg-slate-100 overflow-hidden ${className}`}>
+      {/* 移除 animate-pulse，只保留简单的背景占位，强调“现成图片”感 */}
+      {!loaded && <div className="absolute inset-0 bg-[#F0EAE0]" />} 
+      <img 
+        src={src} 
+        alt={alt} 
+        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)}
+        crossOrigin="anonymous"
+      />
     </div>
   );
 };
@@ -60,212 +26,190 @@ const SmartImage: React.FC<{ src: string; alt: string; className?: string }> = (
 export default function App() {
   const [step, setStep] = useState<AppStep>(AppStep.WELCOME);
   const [selections, setSelections] = useState<CardSelection[]>([]);
-  const [revealedCount, setRevealedCount] = useState(0);
   const [activeCardIdx, setActiveCardIdx] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [generatingImg, setGeneratingImg] = useState(false); // 仅用于 html2canvas 生成图片时的遮罩
   const [remedy, setRemedy] = useState<RemedyResult | null>(null);
+  const [deckSpread, setDeckSpread] = useState<TarotCard[]>([]);
   
   const reportRef = useRef<HTMLDivElement>(null);
-  const deck = useMemo(() => alchemistService.getOHDeck(), []);
+  const fullDeck = useMemo(() => alchemistService.getTarotDeck(), []);
 
   const resetApp = () => {
     setSelections([]);
-    setRevealedCount(0);
     setActiveCardIdx(0);
     setRemedy(null);
     setStep(AppStep.WELCOME);
+    setDeckSpread([]);
   };
 
   const handleStart = () => {
-    const shuffled = [...deck].sort(() => Math.random() - 0.5).slice(0, 3);
-    const meanings = ["回顾过去", "把握现在", "展望未来"];
-    setSelections(shuffled.map((img, i) => ({
-      imageUrl: img,
-      meaning: meanings[i],
-      userText: "",
-      selectedColor: "",
-      palette: []
-    })));
+    // 随机打乱牌组
+    setDeckSpread([...fullDeck].sort(() => Math.random() - 0.5));
     setStep(AppStep.DRAW_CARDS);
   };
 
-  const revealCard = (idx: number) => {
-    if (idx === revealedCount) {
-      setRevealedCount(prev => prev + 1);
-    }
+  const handleCardClick = (card: TarotCard) => {
+    if (selections.length >= 3) return;
+    if (selections.find(s => s.card.id === card.id)) return;
+
+    const newSelection: CardSelection = {
+      card: card,
+      index: selections.length + 1
+    };
+    setSelections([...selections, newSelection]);
   };
 
-  const startInterpretation = async () => {
-    setLoading(true);
-    const updated = await Promise.all(selections.map(async (s) => {
-      const palette = await extractColorsFromImage(s.imageUrl);
-      return { ...s, palette };
-    }));
-    setSelections(updated);
-    setLoading(false);
-    setStep(AppStep.INTERPRET);
+  const nextStep = async () => {
+     setStep(AppStep.INTERPRET);
   };
 
   const generateFinalRemedy = async () => {
-    setLoading(true);
-    try {
-      const res = await alchemistService.generateRemedy(selections);
-      setRemedy(res);
-      setStep(AppStep.REMEDY);
-    } catch (e) {
-      alert("网络信号稍弱，请您重新点击试一次。");
-    } finally {
-      setLoading(false);
-    }
+    // 直接获取结果，无加载界面
+    const res = await alchemistService.generateRemedy(selections);
+    setRemedy(res);
+    setStep(AppStep.REMEDY);
   };
 
+  const btnPrimary = "px-10 py-4 bg-[#A61B1B] text-white rounded-full text-lg font-bold tracking-[0.2em] shadow-lg hover:bg-[#8a1616] hover:shadow-xl transition-all transform hover:-translate-y-1 active:scale-95";
+
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-[#1A1A1A] font-sans flex flex-col relative selection:bg-[#E8C68E]/30 overflow-x-hidden">
-      {loading && <LoadingOverlay />}
+    <div className="min-h-screen bg-[#FDFBF7] text-[#1A1A1A] font-sans flex flex-col relative overflow-x-hidden">
+      {/* 仅在保存图片时显示的简单遮罩 */}
+      {generatingImg && (
+        <div className="fixed inset-0 z-[999] bg-black/50 flex items-center justify-center">
+            <div className="text-white font-bold tracking-widest">正在保存海报...</div>
+        </div>
+      )}
       
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-7xl mx-auto w-full">
+      {/* 顶部 Logo 区 */}
+      <div className="absolute top-6 left-0 right-0 flex justify-center z-10 pointer-events-none">
+         <div className="flex flex-col items-center opacity-80">
+             <span className="text-[10px] tracking-[0.3em] text-[#A61B1B] uppercase mb-1 font-bold">2026 Happy New Year</span>
+             <div className="w-8 h-8 rounded-full border border-[#A61B1B] flex items-center justify-center">
+                <span className="text-[#A61B1B] text-xs font-serif font-bold">福</span>
+             </div>
+         </div>
+      </div>
+
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 max-w-6xl mx-auto w-full relative z-20">
         
         {step === AppStep.WELCOME && (
-          <div className="w-full max-w-4xl text-center space-y-12 reveal-up px-4">
-            <div className="space-y-6">
-              <span className="text-[#A61B1B] text-sm font-bold tracking-[0.5em] block opacity-80">2026 丙午马年 · 辞旧迎新</span>
-              <h1 className="text-6xl md:text-8xl font-serif tracking-tight leading-none font-bold text-[#1A1A1A]">
-                鸿运<br/><span className="text-[#A61B1B]">特调</span>
+          <div className="w-full text-center space-y-10 reveal-up">
+            <div className="space-y-4 relative">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#A61B1B] opacity-5 rounded-full blur-3xl"></div>
+              <h2 className="text-xl md:text-2xl text-[#A61B1B] font-serif font-bold tracking-widest">年会 · 运势特调</h2>
+              <h1 className="text-6xl md:text-8xl font-serif font-bold text-[#1A1A1A] leading-tight">
+                新年<span className="text-[#A61B1B]">快乐</span>
               </h1>
-              <div className="w-24 h-1 bg-[#A61B1B] mx-auto my-8"></div>
-              <p className="text-xl md:text-2xl text-slate-600 font-serif leading-relaxed max-w-2xl mx-auto">
-                人生如茶，沉浮之间皆是味道。<br/>
-                抽取三张卡片，回顾过往，期许未来。<br/>
-                为您调制一杯专属的<span className="font-bold text-[#A61B1B]">“马年开运饮”</span>。
-              </p>
+              <div className="w-20 h-1.5 bg-[#A61B1B] mx-auto rounded-full"></div>
             </div>
-            <button 
-              onClick={handleStart}
-              className="px-16 py-6 bg-[#A61B1B] text-white rounded-full text-lg font-bold tracking-[0.2em] transition-all hover:bg-[#8a1616] shadow-xl hover:shadow-2xl hover:-translate-y-1"
-            >
-              开启好运之旅
-            </button>
+            
+            <p className="text-lg md:text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto font-serif">
+              塔罗指引方向，美酒庆祝新生。<br/>
+              请抽取 <span className="text-[#A61B1B] font-bold">三张标准塔罗牌</span>，<br/>
+              领取您的<span className="border-b-2 border-[#A61B1B]">2026专属新年特调</span>。
+            </p>
+
+            <div className="pt-8">
+              <button onClick={handleStart} className={btnPrimary}>
+                开启好运仪式
+              </button>
+            </div>
           </div>
         )}
 
         {step === AppStep.DRAW_CARDS && (
-          <div className="w-full max-w-5xl space-y-10 reveal-up text-center px-4">
-            <header className="space-y-3">
-              <h2 className="text-4xl font-serif font-bold text-[#1A1A1A]">请翻开您的人生卡片</h2>
-              <p className="text-slate-500 text-lg">依次点击下方三张牌，看看您的运势意象</p>
+          <div className="w-full space-y-8 reveal-up flex flex-col h-full justify-center items-center">
+            <header className="text-center space-y-2">
+              <h2 className="text-3xl font-serif font-bold text-[#1A1A1A]">抽取三张新年指引</h2>
+              <p className="text-slate-500 text-sm tracking-widest">相信直觉，心诚则灵 ({selections.length}/3)</p>
             </header>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-              {selections.map((s, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => revealCard(i)}
-                  className={`group perspective-1000 cursor-pointer ${i > revealedCount ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}
-                >
-                  <div className={`relative aspect-[3/4] rounded-[2rem] border-[6px] border-white shadow-xl transition-all duration-1000 transform-style-3d ${i < revealedCount ? 'rotate-y-0' : 'rotate-y-180'}`}>
-                    {/* 卡牌正面 */}
-                    <div className="absolute inset-0 backface-hidden">
-                      <SmartImage src={s.imageUrl} alt={s.meaning} className="w-full h-full rounded-[1.5rem]" />
-                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent rounded-b-[1.5rem]"></div>
-                      <div className="absolute bottom-6 left-0 right-0 text-white font-serif text-2xl font-bold tracking-[0.3em]">{s.meaning}</div>
-                    </div>
-                    {/* 卡牌背面 */}
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-[#A61B1B] flex flex-col items-center justify-center p-6 rounded-[1.5rem] shadow-inner">
-                      <div className="w-full h-full border-[3px] border-[#E8C68E]/30 rounded-[1rem] flex items-center justify-center bg-[#8E1616]">
-                        <div className="text-center">
-                          <span className="block text-[#E8C68E] text-5xl font-serif mb-2">福</span>
-                          <span className="text-[#E8C68E]/50 text-xs tracking-widest">点击翻开</span>
-                        </div>
+            
+            <div className="w-full max-w-4xl min-h-[320px] flex flex-wrap justify-center content-center gap-3 md:gap-4 perspective-1000 py-4">
+               {selections.length < 3 && deckSpread.slice(0, 22).map((card) => {
+                 const isSelected = selections.find(s => s.card.id === card.id);
+                 if (isSelected) return null;
+
+                 return (
+                   <div 
+                     key={card.id}
+                     onClick={() => handleCardClick(card)}
+                     className="w-20 h-32 md:w-24 md:h-36 bg-[#2C2C2C] rounded-lg cursor-pointer hover:-translate-y-3 transition-all duration-300 relative flex items-center justify-center group shadow-md border-[3px] border-[#D4AF37]"
+                   >
+                      {/* 卡背设计：经典几何 */}
+                      <div className="absolute inset-2 border border-[#D4AF37] opacity-40 rounded-sm flex flex-col items-center justify-center">
+                         <div className="w-12 h-12 rounded-full border border-[#D4AF37] flex items-center justify-center opacity-60">
+                           <div className="w-8 h-8 rotate-45 border border-[#D4AF37]"></div>
+                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-30"></div>
+                   </div>
+                 );
+               })}
             </div>
-            {revealedCount === 3 && (
-              <button 
-                onClick={startInterpretation}
-                className="px-16 py-5 bg-[#1A1A1A] text-white rounded-full text-lg font-bold tracking-[0.2em] animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl hover:bg-black"
-              >
-                开始解读我的运势
-              </button>
+
+            <div className="w-full max-w-3xl flex justify-center gap-4 md:gap-8 min-h-[160px]">
+               {selections.map((s, i) => (
+                 <div key={i} className="relative w-24 h-32 md:w-32 md:h-44 bg-white p-1 shadow-xl rounded-lg transform transition-all animate-[reveal-up_0.5s_ease-out]">
+                    <SmartImage src={s.card.imageUrl} alt="Selected" className="w-full h-full object-cover rounded" />
+                    <div className="absolute -top-3 -right-3 w-7 h-7 bg-[#A61B1B] text-white rounded-full flex items-center justify-center text-sm font-bold shadow border-2 border-[#FDFBF7]">
+                      {s.index}
+                    </div>
+                 </div>
+               ))}
+               {Array.from({ length: 3 - selections.length }).map((_, i) => (
+                  <div key={`empty-${i}`} className="w-24 h-32 md:w-32 md:h-44 border-2 border-dashed border-[#A61B1B]/20 rounded-lg flex items-center justify-center bg-[#A61B1B]/5">
+                     <span className="text-xs text-[#A61B1B]/40 font-bold">待抽取</span>
+                  </div>
+               ))}
+            </div>
+
+            {selections.length === 3 && (
+              <div className="pt-4">
+                <button onClick={nextStep} className={btnPrimary}>
+                  揭晓牌面
+                </button>
+              </div>
             )}
           </div>
         )}
 
         {step === AppStep.INTERPRET && (
-          <div className="w-full max-w-6xl space-y-8 reveal-up px-4">
-            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
+          <div className="w-full max-w-5xl reveal-up px-4">
+            <div className="bg-white p-6 md:p-12 rounded-[2rem] shadow-xl border border-[#E8C68E]/20 flex flex-col lg:flex-row gap-8 lg:gap-12 items-center">
               <div className="w-full lg:w-5/12 space-y-6">
-                <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl border-[8px] border-white bg-slate-100">
-                  <SmartImage src={selections[activeCardIdx].imageUrl} alt="Focus" className="w-full h-full" />
-                  <div className="absolute top-6 left-6 bg-[#A61B1B] text-white px-6 py-2 rounded-full font-serif text-lg tracking-widest shadow-lg">
-                    {selections[activeCardIdx].meaning}
-                  </div>
-                </div>
-                {/* 进度条 */}
-                <div className="flex justify-center gap-3">
+                 <div className="aspect-[2/3] w-full rounded-xl overflow-hidden shadow-lg border-8 border-[#FDFBF7] bg-slate-100 relative">
+                   <SmartImage src={selections[activeCardIdx].card.imageUrl} alt="Card" className="w-full h-full object-cover" />
+                 </div>
+                 <div className="flex justify-center gap-2">
                   {selections.map((_, i) => (
-                    <div key={i} className={`h-2 rounded-full transition-all duration-700 ${i === activeCardIdx ? 'w-12 bg-[#A61B1B]' : 'w-3 bg-slate-300'}`} />
+                    <div key={i} className={`h-2 rounded-full transition-all duration-300 ${i === activeCardIdx ? 'w-10 bg-[#A61B1B]' : 'w-2 bg-slate-200'}`} />
                   ))}
                 </div>
               </div>
 
-              <div className="w-full lg:w-7/12 bg-white rounded-[3rem] p-8 md:p-12 shadow-xl flex flex-col justify-between min-h-[500px] border border-slate-100">
-                <div className="space-y-10">
-                  <header>
-                    <h2 className="text-4xl font-serif mb-3 font-bold text-[#1A1A1A]">看着这张图，您想到了什么？</h2>
-                    <p className="text-slate-500 font-serif text-lg">是曾经奋斗的日子？是现在的家庭？还是对未来的期许？<br/>请凭直觉写下一两句心里话。</p>
-                  </header>
-
-                  <textarea 
-                    autoFocus
-                    value={selections[activeCardIdx].userText}
-                    onChange={(e) => {
-                      const updated = [...selections];
-                      updated[activeCardIdx].userText = e.target.value;
-                      setSelections(updated);
-                    }}
-                    placeholder="例如：看到这座山，想到了这几年事业上的不易，但终究是挺过来了..."
-                    className="w-full h-40 bg-[#FDFBF7] border border-slate-200 rounded-[2rem] p-6 text-xl font-serif text-[#1A1A1A] outline-none focus:ring-2 focus:ring-[#A61B1B]/20 shadow-inner resize-none placeholder:text-slate-300"
-                  />
-
-                  <div className="space-y-4">
-                    <p className="text-sm font-bold text-slate-500 tracking-widest">请选择一个代表此刻心情的颜色：</p>
-                    <div className="flex flex-wrap gap-4">
-                      {selections[activeCardIdx].palette.map((color, i) => (
-                        <button 
-                          key={i}
-                          onClick={() => {
-                            const updated = [...selections];
-                            updated[activeCardIdx].selectedColor = color;
-                            setSelections(updated);
-                          }}
-                          className={`w-14 h-14 rounded-full transition-all duration-300 flex items-center justify-center ${selections[activeCardIdx].selectedColor === color ? 'scale-110 ring-4 ring-[#A61B1B]/20 shadow-xl' : 'hover:scale-105 shadow-md border-2 border-white'}`}
-                          style={{ backgroundColor: color }}
-                        >
-                           {selections[activeCardIdx].selectedColor === color && <i className="fas fa-check text-white drop-shadow-md"></i>}
-                        </button>
-                      ))}
-                    </div>
+              <div className="w-full lg:w-7/12 flex flex-col justify-center text-center lg:text-left space-y-8">
+                <div>
+                  <div className="inline-block px-3 py-1 bg-[#A61B1B]/10 text-[#A61B1B] text-xs font-bold tracking-widest rounded-full mb-4">
+                    STANDARD TAROT · CARD 0{activeCardIdx + 1}
                   </div>
+                  <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#1A1A1A] mb-6">
+                    {selections[activeCardIdx].card.name}
+                  </h2>
+                  <div className="w-16 h-1 bg-[#E8C68E] mx-auto lg:mx-0 rounded-full"></div>
                 </div>
 
-                <div className="pt-8">
+                <div className="pt-6">
                   {activeCardIdx < 2 ? (
                     <button 
-                      disabled={!selections[activeCardIdx].userText || !selections[activeCardIdx].selectedColor}
                       onClick={() => setActiveCardIdx(prev => prev + 1)}
-                      className="w-full py-5 bg-[#1A1A1A] text-white rounded-full font-bold text-lg tracking-[0.2em] disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:bg-black shadow-lg"
+                      className="w-full py-4 border-2 border-slate-200 text-slate-500 rounded-full font-bold hover:border-[#A61B1B] hover:text-[#A61B1B] transition-all tracking-widest"
                     >
-                      下一张：{selections[activeCardIdx+1].meaning}
+                      下一张
                     </button>
                   ) : (
-                    <button 
-                      disabled={!selections[activeCardIdx].userText || !selections[activeCardIdx].selectedColor}
-                      onClick={generateFinalRemedy}
-                      className="w-full py-5 bg-[#A61B1B] text-white rounded-full font-bold text-lg tracking-[0.2em] disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:bg-[#8a1616] shadow-xl"
-                    >
-                      生成我的开运特调
+                    <button onClick={generateFinalRemedy} className={btnPrimary + " w-full"}>
+                      查看我的新年特调
                     </button>
                   )}
                 </div>
@@ -275,93 +219,111 @@ export default function App() {
         )}
 
         {step === AppStep.REMEDY && remedy && (
-          <div className="w-full max-w-6xl flex flex-col lg:flex-row items-stretch reveal-up py-4 gap-8 lg:gap-12" ref={reportRef}>
-            <div className="lg:w-1/2 flex flex-col items-center justify-center bg-[#1A1A1A] rounded-[3rem] p-12 overflow-hidden relative shadow-2xl">
-               {/* 装饰纹理 */}
-               <div className="absolute top-0 right-0 p-10 opacity-10 text-[#E8C68E] text-9xl font-serif select-none pointer-events-none">福</div>
-               
-               {/* 图片区域 - 无遮挡、原样展示 */}
-               <div className="relative w-full max-w-sm aspect-square rounded-[2.5rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.6)] border-[4px] border-[#333] bg-black mb-10">
-                  <SmartImage src={remedy.cocktailImageUrl!} alt="Remedy" className="w-full h-full object-cover" />
-               </div>
+          <div className="w-full max-w-4xl reveal-up pb-8 px-2 flex flex-col items-center">
+             
+             {/* 
+                专门用于生成海报的容器 
+                特点：固定宽高比 (375x600 比例)，固定内边距，确保内容不溢出
+             */}
+             <div 
+               ref={reportRef} 
+               className="bg-[#FDFBF7] w-full max-w-[375px] md:max-w-[400px] mx-auto shadow-2xl relative overflow-hidden flex flex-col border-[12px] border-white box-border"
+               style={{ aspectRatio: '375/620', height: 'auto' }} 
+             >
+                {/* 顶部 Banner */}
+                <div className="bg-[#A61B1B] h-14 flex items-center justify-between px-5 shrink-0 relative z-10">
+                   <span className="text-[#E8C68E] font-bold tracking-[0.2em] text-[10px] md:text-xs">2026 HAPPY NEW YEAR</span>
+                   <div className="w-6 h-6 rounded-full border border-[#E8C68E] flex items-center justify-center">
+                     <span className="text-[#E8C68E] font-serif text-[10px]">福</span>
+                   </div>
+                </div>
 
-               {/* 文字区域 - 移至下方 */}
-               <div className="text-center space-y-4 relative z-10">
-                  <p className="text-xs tracking-[0.5em] font-bold text-[#E8C68E] opacity-60 uppercase">2026 丙午马年 · 珍藏</p>
-                  <h2 className="text-4xl md:text-5xl font-serif text-white font-bold tracking-wide leading-tight">{remedy.name}</h2>
-               </div>
-            </div>
+                {/* 主图 - 固定高度比例 */}
+                <div className="relative w-full aspect-square shrink-0 bg-slate-100">
+                  <SmartImage src={remedy.cocktailImageUrl} alt="Cocktail" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#FDFBF7] via-transparent to-transparent h-20 bottom-0 top-auto"></div>
+                </div>
 
-            <div className="lg:w-1/2 flex flex-col">
-              <div className="bg-white rounded-[3rem] p-10 md:p-14 shadow-xl flex-1 flex flex-col justify-between border border-slate-100 relative overflow-hidden">
-                <div className="space-y-10">
-                  <header className="space-y-4 border-b border-slate-100 pb-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-[#A61B1B] tracking-[0.2em] bg-[#A61B1B]/10 px-3 py-1 rounded-full">专属开运报告</span>
-                      <span className="text-slate-400 text-xs tracking-widest font-serif">{new Date().toLocaleDateString('zh-CN')}</span>
-                    </div>
-                  </header>
-
-                  <div className="space-y-8">
-                    {/* 寄语 */}
-                    <div className="bg-[#FDFBF7] p-8 rounded-2xl border-l-4 border-[#A61B1B]">
-                      <p className="text-2xl font-serif text-[#A61B1B] leading-relaxed">
-                        “{remedy.vibe}”
-                      </p>
-                    </div>
-
-                    {/* 解读 */}
-                    <div className="space-y-3">
-                       <h3 className="text-sm font-bold text-slate-400 tracking-widest uppercase">大师解读</h3>
-                       <p className="text-xl text-slate-700 leading-relaxed font-serif text-justify">
-                         {remedy.description}
-                       </p>
-                    </div>
-                    
-                    {/* 成分 */}
-                    <div className="space-y-4">
-                      <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">特调成分</p>
-                      <div className="flex flex-wrap gap-3">
-                        {remedy.ingredients.map((ing, i) => (
-                          <span key={i} className="px-5 py-2 bg-[#F5F5F5] text-slate-600 rounded-full text-sm font-serif border border-slate-200">{ing}</span>
-                        ))}
+                {/* 内容区域 - 紧凑排版 */}
+                <div className="flex-1 px-6 pb-6 flex flex-col relative -mt-5">
+                   <div className="flex-1 space-y-3 text-center">
+                      
+                      {/* 标题 */}
+                      <div>
+                        <p className="text-[#A61B1B] text-[10px] font-bold tracking-[0.3em] uppercase mb-1">{remedy.subName}</p>
+                        <h1 className="text-2xl md:text-3xl font-serif font-bold text-[#1A1A1A] mb-2">{remedy.name}</h1>
+                        <div className="w-8 h-0.5 bg-[#E8C68E] mx-auto"></div>
                       </div>
-                    </div>
-                  </div>
+
+                      {/* 描述 (限制行数，防止溢出) */}
+                      <p className="text-slate-600 text-xs leading-relaxed font-serif px-1 line-clamp-4">
+                        {remedy.description}
+                      </p>
+
+                      {/* 信息块 */}
+                      <div className="grid grid-cols-2 gap-3 text-left border-t border-slate-200 pt-3 mt-2">
+                         <div className="space-y-1">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Recipe</span>
+                            <div className="flex flex-wrap gap-1">
+                              {remedy.ingredients.slice(0, 3).map((ing, i) => (
+                                <span key={i} className="text-[9px] text-[#A61B1B] bg-[#A61B1B]/5 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{ing}</span>
+                              ))}
+                            </div>
+                         </div>
+                         <div className="space-y-1 border-l border-slate-100 pl-3">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Action</span>
+                            <p className="text-[10px] text-[#1A1A1A] font-bold leading-tight line-clamp-3">{remedy.actionItem}</p>
+                         </div>
+                      </div>
+                   </div>
+
+                   {/* 底部版权 */}
+                   <div className="text-center pt-4 mt-1 opacity-40 shrink-0">
+                      <p className="text-[8px] font-serif tracking-[0.3em]">MIND SPIRIT LAB · 2026</p>
+                   </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4 mt-12 no-print">
-                  <button onClick={resetApp} className="flex-1 py-4 border-2 border-slate-200 text-slate-500 rounded-full font-bold hover:bg-slate-50 transition-all">
-                    再抽一次
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (!reportRef.current) return;
-                      setLoading(true);
-                      try {
-                        const canvas = await html2canvas(reportRef.current, { scale: 3, useCORS: true, backgroundColor: "#FDFBF7" });
-                        const link = document.createElement('a');
-                        link.download = `2026马年开运-${remedy.name}.png`;
-                        link.href = canvas.toDataURL();
-                        link.click();
-                      } finally {
-                        setLoading(false);
-                      }
-                    }} 
-                    className="flex-[2] py-4 bg-[#A61B1B] text-white rounded-full font-bold shadow-lg hover:bg-[#8a1616] transition-all flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-download"></i> 保存图片发朋友圈
-                  </button>
-                </div>
-              </div>
-            </div>
+                {/* 纹理遮罩 */}
+                <div className="absolute inset-0 pointer-events-none opacity-20 mix-blend-multiply bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"></div>
+             </div>
+
+             <div className="mt-8 flex gap-4 no-print pb-12">
+               <button onClick={resetApp} className="w-12 h-12 rounded-full border-2 border-[#A61B1B] text-[#A61B1B] flex items-center justify-center hover:bg-[#A61B1B] hover:text-white transition-all shadow-md">
+                 <i className="fas fa-redo"></i>
+               </button>
+               <button 
+                 onClick={async () => {
+                   if (!reportRef.current) return;
+                   setGeneratingImg(true);
+                   try {
+                     const canvas = await html2canvas(reportRef.current, { 
+                       scale: 3, 
+                       useCORS: true, 
+                       backgroundColor: "#FDFBF7",
+                       allowTaint: true
+                     });
+                     const link = document.createElement('a');
+                     link.download = `2026新年特调-${remedy.name}.png`;
+                     link.href = canvas.toDataURL("image/png", 1.0);
+                     link.click();
+                   } finally {
+                     setGeneratingImg(false);
+                   }
+                 }}
+                 className={btnPrimary + " flex items-center gap-2"}
+               >
+                 <i className="fas fa-download"></i> 保存专属海报
+               </button>
+             </div>
           </div>
         )}
       </main>
 
-      <footer className="py-8 text-center no-print">
-        <p className="text-xs text-slate-400 font-serif tracking-widest">© 2026 马年 · 灵感特调厅</p>
-      </footer>
+      {step !== AppStep.REMEDY && (
+        <footer className="py-6 text-center no-print opacity-50 relative z-20">
+          <p className="text-[10px] text-[#A61B1B] font-serif tracking-widest">© 2026 Annual Gala · Mind Spirit Lab</p>
+        </footer>
+      )}
     </div>
   );
 }
